@@ -1,16 +1,17 @@
 import numpy as np
 import copy
 import cv2
-def draw_rotated_bbox(img, rect, box, color):
+def draw_rotated_bbox(img, rect, box, color,mask_index,grid_cord):
     if rect is not None and box is not None:
         cv2.drawContours(img, [box], 0, color, 2)
         cv2.circle(img, box[0], 2, [0, 0, 255], 5) # Red 1
         cv2.circle(img, box[1], 2, [0, 255, 255], 5) # Yellow 2
         cv2.circle(img, box[2], 2, [255, 0, 0], 5) # Blue 3
-
+        text=f"idx:{mask_index} grid({grid_cord[0]},{grid_cord[1]})"
+        draw_text(img, text, box[0], (0, 0, 255), thickness=2);
     return img
 
-def draw_text(img, text, position, color, font=cv2.FONT_HERSHEY_SIMPLEX, thickness=2):
+def draw_text(img, text, position, color, thickness=2,font=cv2.FONT_HERSHEY_SIMPLEX):
     cv2.putText(img, text, position, font, 1, color, thickness)
     return img
 

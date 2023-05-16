@@ -49,18 +49,21 @@ def get_grid(img, row=4, offset_x=0, offset_y=0):
 
 
 
-def mask_in_grid(mask_center, grid):
+def mask_center_in_grid(mask_center, grid):
     for i, row in enumerate(grid):
         for j, cell in enumerate(row):
+            
             if cell["grid"][0][0] <= mask_center[0] <= cell["grid"][1][0] and cell["grid"][0][1] <= mask_center[1] <= cell["grid"][1][1]:
                 return i, j
     return -1, -1
 
 
 
+
 def process_mask_grid(masks, grid,mask_coordinates, center_diff_thresh):
     grid_with_masks = copy.deepcopy(grid)
     mask_data = []
+    bbox_in_grid_map=[]
     for mask_index, mask in enumerate(masks):
         left,top = mask_coordinates[mask_index]
         rect, box = get_rotated_bbox(mask,left,top)
@@ -69,15 +72,17 @@ def process_mask_grid(masks, grid,mask_coordinates, center_diff_thresh):
             width, height = rect[1]
             if width < height:
                 width, height = height, width
-            row, col = mask_in_grid(mask_center, grid)
-
+            row, col = mask_center_in_grid(mask_center, grid)
+            bbox_in_grids_arr = bbox_in_grids(box,grid)
+            #print(f"row:{row}, col:{col} , mask_center:{mask_center},grid:{grid}")
             # Calculate the average grayscale value from the mask area
             mask_pixels = mask[mask == 255]
             color = np.mean(mask_pixels)
 
-            mask_data.append((mask_center, rect, box, (width, height, color), (row, col)))
+            mask_data.append((mask_center, rect, box, (width, height, color), (row, col),bbox_in_grids_arr))
         else:
             mask_data.append(None)
+
 
         if row >= 0 and col >= 0:
             grid_center = grid[row][col]["center"]
@@ -98,13 +103,23 @@ def process_mask_grid(masks, grid,mask_coordinates, center_diff_thresh):
             if center_diff_ratio < center_diff_thresh:
                 grid_with_masks[row][col]["masks_cdt_valid"].append(mask_index)
 
-            if "masks_in_grid" not in grid_with_masks[row][col]:
-                grid_with_masks[row][col]["masks_in_grid"] = []
-
-            grid_with_masks[row][col]["masks_in_grid"].append(mask_index)
+            
 
     return grid_with_masks, mask_data
 
+def bbox_in_grids(bbox, grid):
+    mask_grids = []
+   
+    x_start, y_start = np.min(bbox, axis=0)
+    x_end, y_end = np.max(bbox, axis=0)
+
+    for i, row in enumerate(grid):
+        for j, cell in enumerate(row):
+            cell_start, cell_end = cell["grid"]  # Assuming cell is { "grid": ((x_start, y_start), (x_end, y_end)) }
+            if ((cell_start[0] <= x_start <= cell_end[0] or cell_start[0] <= x_end <= cell_end[0]) and
+               (cell_start[1] <= y_start <= cell_end[1] or cell_start[1] <= y_end <= cell_end[1])):
+                mask_grids.append((i, j))  # if bbox falls within the cell, append the cell's grid coordinates
+    return mask_grids
 
 def get_rotated_bbox(mask, x0, y0):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -114,55 +129,46 @@ def get_rotated_bbox(mask, x0, y0):
         box = cv2.boxPoints(rect)
         box = np.intp(box)
 
-        # Add the global coordinate offsets
+        # Add the global coordinate offsets to rect and box
+        rect = ((rect[0][0] + x0, rect[0][1] + y0), rect[1], rect[2])
         box[:, 0] += x0
         box[:, 1] += y0
-        # print(f"rect:{rect}")
-        # print(f"box:{box}")
+
         return rect, box
+
     return None, None
 
-def check_overlap(masks, mask_data, grid_with_masks, overlap_thresh):
-    overlapping_info = [{}] * len(masks)
 
-    for row in range(len(grid_with_masks)):
-        for col in range(len(grid_with_masks[row])):
-            #print(f"grid_with_masks[row][col]:{grid_with_masks[row][col]}")
-            if "masks_in_grid" not in grid_with_masks[row][col]:
+def check_overlap(mask_data, overlap_thresh):
+        overlapping_info = [{}] * len(mask_data)
+
+        for i, mask_datum1 in enumerate(mask_data):
+            if overlapping_info[i].get('is_overlap', False):
                 continue
-            masks_in_grid = grid_with_masks[row][col]["masks_in_grid"]
-
-            for i, mask_index1 in enumerate(masks_in_grid):
-                if overlapping_info[mask_index1].get('is_overlap', False):
+            box1 = mask_datum1[2]
+            for j, mask_datum2 in enumerate(mask_data[i+1:], start=i+1): # Start at i+1 to avoid comparing a mask with itself
+                if overlapping_info[j].get('is_overlap', False):
                     continue
-                #print(f"mask_data[mask_index1]: {mask_data[mask_index1]}")
-                box1 = mask_data[mask_index1][2]
-                #print(f"box1: {box1}")
+                box2 = mask_datum2[2]
+                intersection, is_overlap, overlap_percentage = is_bbox_overlap(box1, box2,[i,j] ,overlap_thresh)
 
-                for j, mask_index2 in enumerate(masks_in_grid):
-                    if i == j or overlapping_info[mask_index2].get('is_overlap', False):
-                        continue
+                if is_overlap:
+                    overlapping_info[i] = {
+                        'intersection': intersection,
+                        'is_overlap': is_overlap,
+                        'overlap_percentage': overlap_percentage
+                    }
+                    overlapping_info[j] = {
+                        'intersection': intersection,
+                        'is_overlap': is_overlap,
+                        'overlap_percentage': overlap_percentage
+                    }
 
-                    box2 = mask_data[mask_index2][2]
-                    intersection, is_overlap, overlap_percentage = is_bbox_overlap(box1, box2, (mask_index1, mask_index2), (col, row), overlap_thresh)
-
-                    if is_overlap:
-                        overlapping_info[mask_index1] = {
-                            'intersection': intersection,
-                            'is_overlap': is_overlap,
-                            'overlap_percentage': overlap_percentage
-                        }
-                        overlapping_info[mask_index2] = {
-                            'intersection': intersection,
-                            'is_overlap': is_overlap,
-                            'overlap_percentage': overlap_percentage
-                        }
-
-    return overlapping_info
+        return overlapping_info
 
 
 
-def is_bbox_overlap(bbox1, bbox2, mask_indices, grid_coords, overlap_thresh):
+def is_bbox_overlap(bbox1, bbox2,mask_indices, overlap_thresh):
     is_overlapping = False
     box1_points = bbox1
     box2_points = bbox2
@@ -173,7 +179,8 @@ def is_bbox_overlap(bbox1, bbox2, mask_indices, grid_coords, overlap_thresh):
     
     # Calculate the intersection polygon
     intersection = polygon1.intersection(polygon2)
-
+    #print(f"mask_indices: {mask_indices} bbox1:{bbox1} bbox2:{bbox2} intersection:{intersection}" )
+    
     # Check if the intersection area is empty
     if intersection.is_empty:
         return intersection, is_overlapping, 0
@@ -182,16 +189,16 @@ def is_bbox_overlap(bbox1, bbox2, mask_indices, grid_coords, overlap_thresh):
     area1 = polygon1.area
     area2 = polygon2.area
     intersection_area = intersection.area
-
+    #print(f"mask_indices: {mask_indices} intersection_area:{intersection_area}")
     # Calculate the union area
     union_area = area1 + area2 - intersection_area
 
     # Calculate the overlap percentage
     overlap_percentage = intersection_area / union_area
     is_overlapping = overlap_percentage > overlap_thresh
-
+    #print(f"mask_indices: {mask_indices} intersection_area:{intersection_area} overlap_percentage:{overlap_percentage} overlap_thresh:{overlap_thresh} is_overlapping:{is_overlapping}")
     # if is_overlapping:
-    #     print(f"intersection_area: {intersection_area}, union_area: {union_area}, is_overlapping: {is_overlapping}, overlap_percentage: {overlap_percentage:.4f}, mask_indices: {mask_indices}, grid_coords: {grid_coords}")
+    #print(f"intersection_area: {intersection_area}, union_area: {union_area}, is_overlapping: {is_overlapping}, overlap_percentage: {overlap_percentage:.4f}, mask_indices: {mask_indices}, grid_coords: {grid_coords}")
     
     return intersection, is_overlapping, overlap_percentage
 
@@ -221,14 +228,15 @@ def is_bbox_overlap_cv2(bbox1, bbox2, mask_indices, grid_coords, overlap_thresh)
     area2 = cv2.contourArea(box2_points)
 
     union_area = area1 + area2 - intersection_area_value
-
+    print(f"mask_indices: {mask_indices}, grid_coords: {grid_coords} intersection_area: {intersection_area_value}" )
     if union_area == 0:
+        
         return intersection_points, is_overlapping, 0
 
     overlap_percentage = intersection_area_value / union_area
     is_overlapping = overlap_percentage > overlap_thresh
 
-    if is_overlapping:
-        print(f"intersection_area: {intersection_area_value}, union_area: {union_area}, is_overlapping: {is_overlapping}, overlap_percentage: {overlap_percentage:.4f}, mask_indices: {mask_indices}, grid_coords: {grid_coords}")
+    #if is_overlapping:
+    print(f"mask_indices: {mask_indices}, grid_coords: {grid_coords} intersection_area: {intersection_area_value}, union_area: {union_area}, is_overlapping: {is_overlapping}, overlap_percentage: {overlap_percentage:.4f}")
 
     return intersection_points, is_overlapping, overlap_percentage

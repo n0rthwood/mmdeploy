@@ -13,7 +13,7 @@ print(f"{sys.path}")
 from mmdeploy_runtime import Detector
 from datetime import datetime
 from shapely.geometry import Polygon
-from cv.grid_processing import get_grid,process_mask_grid,check_overlap,mask_in_grid
+from cv.grid_processing import get_grid,process_mask_grid,check_overlap,mask_center_in_grid
 from cv.debug_draw import draw_debug_grid,draw_dotted_line,draw_text,draw_rotated_bbox
 
 def parse_args():
@@ -29,7 +29,7 @@ def parse_args():
 
 import time
 
-def process_image(detector, image_path, output_path, overlap_thresh=0.01, center_diff_thresh=0.25):
+def process_image(detector, image_path, output_path, overlap_thresh=0.01, center_diff_thresh=0.35):
     img = cv2.imread(image_path)
     bboxes, labels, masks = detector(img)
     lowest_score = 1.0
@@ -61,12 +61,12 @@ def process_image(detector, image_path, output_path, overlap_thresh=0.01, center
     time_for_process_mask_grid = time.time() - start
 
     start = time.time()
-    overlapping_info = check_overlap(masks, mask_data, grid_with_masks, overlap_thresh)
+    overlapping_info = check_overlap(mask_data, overlap_thresh)
     time_for_check_overlap = time.time() - start
 
     detection_result = [''] * len(confident_masks)
 
-
+    #print(f"{grid_with_masks}")
     start = time.time()
     for row_index, row in enumerate(grid_with_masks):
         for col_index, cell in enumerate(row):
@@ -79,25 +79,25 @@ def process_image(detector, image_path, output_path, overlap_thresh=0.01, center
             if len(masks_cdt_valid) > 1:
                 for mask_id in masks_cdt_valid:
                     if detection_result[mask_id] != '':
-                        print(f'Warning: Skipping mask {mask_id} which already has a result.')
+                        print(f'Warning: Skipping mask {mask_id} for close which already has a result.{detection_result[mask_id]}')
                         continue
                     detection_result[mask_id] = 'close'
             for mask_id in masks_center_in_grid:
                 if mask_id not in masks_cdt_valid:
                     if detection_result[mask_id] != '':
-                        print(f'Warning: Skipping mask {mask_id} which already has a result.')
+                        print(f'Warning: Skipping mask {mask_id} for distant which already has a result.{detection_result[mask_id]}')
                         continue
                     detection_result[mask_id] = 'distant'
-            if len(masks_in_grid) > 1:
-                for i, overlap_info in enumerate(overlapping_info):
-                    if 'is_overlap' in overlap_info and overlap_info['is_overlap']:
-                        detection_result[i] = 'overlapping'
+            
+            
 
-
+    for i, overlap_info in enumerate(overlapping_info):
+                if 'is_overlap' in overlap_info and overlap_info['is_overlap']:
+                    detection_result[i] = 'overlapping'
    
     time_for_detection_result_filling = time.time() - start
 
-    color_dict = {"valid": (0, 255, 0), "overlapping": (0, 0, 255), "close": (0, 0, 255), "distant": (255, 0, 0)}
+    color_dict = {"valid": (0, 255, 0), "overlapping": (0, 0, 255), "close": (0, 0, 125), "distant": (255, 0, 0)}
 
     overlapping_img = img.copy()
     #print(f"detection_result:{detection_result}")
@@ -105,15 +105,23 @@ def process_image(detector, image_path, output_path, overlap_thresh=0.01, center
         if status != '':
             rect, box = mask_datum[1], mask_datum[2]
 
-            img = draw_rotated_bbox(img, rect, box, color_dict[status])
+            img = draw_rotated_bbox(img, rect, box, color_dict[status],i,mask_datum[4])
 
             if status == 'overlapping':
                 # Draw the intersection polygon
-                for overlap_info in overlapping_info:
-                    if 'is_overlap' in overlap_info and overlap_info['is_overlap'] :
+                for overlap_info_index in range(len(overlapping_info)):
+                    overlap_info=overlapping_info[overlap_info_index]
+                    if 'is_overlap' in overlap_info and (not overlap_info['intersection'].is_empty) :
                         intersection_polygon = overlap_info['intersection']
                         intersection_points = np.array([point for point in intersection_polygon.exterior.coords], dtype=np.int32)
-                        cv2.polylines(overlapping_img, [intersection_points], isClosed=True, color=(0, 0, 255), thickness=2)
+                        color=(0, 0, 255)
+                        cv2.polylines(overlapping_img, [intersection_points], isClosed=True, color=color, thickness=2)
+                        
+                        text=f"idex:{overlap_info_index} v:{overlap_info['overlap_percentage']:.3f} "
+                        #print(f"point:{intersection_points[0]}")
+                        draw_point_idx=overlap_info_index%3
+                        draw_color=(0, 0, 255-draw_point_idx*50)
+                        draw_text(overlapping_img, text, (intersection_points[draw_point_idx][0]-40,intersection_points[draw_point_idx][1]), draw_color)
 
     draw_debug_grid(img, grid)
 
@@ -134,7 +142,7 @@ def process_image(detector, image_path, output_path, overlap_thresh=0.01, center
             mask_center = mask_data[idx][0]
             
             # Get the grid cell for this mask
-            i, j = mask_in_grid(mask_center, grid)
+            i, j = mask_center_in_grid(mask_center, grid)
             
             # If the mask is in the grid (i.e., i and j are not -1)
             if i != -1 and j != -1:
@@ -152,7 +160,7 @@ def process_image(detector, image_path, output_path, overlap_thresh=0.01, center
                 }
 
 
-    return final_result, timing
+    return final_result, timing,lowest_score
 
         
 def main():
@@ -179,6 +187,7 @@ def main():
         process_image(detector, args.input_path, args.output_path)
     elif os.path.isdir(args.input_path):
         total_times = []
+        total_times_for_each_key = {"process_mask_grid": [], "check_overlap": [], "detection_result_filling": []}
 
         for root, dirs, files in os.walk(args.input_path):
             for file in files:
@@ -194,6 +203,9 @@ def main():
                     total_time = sum(timing.values())
                     total_times.append(total_time)
 
+                    for key in timing:
+                        total_times_for_each_key[key].append(timing[key])
+
         max_time = max(total_times)
         min_time = min(total_times)
         mean_time = sum(total_times) / len(total_times)
@@ -201,6 +213,17 @@ def main():
         print("Max time: ", max_time)
         print("Min time: ", min_time)
         print("Mean time: ", mean_time)
+
+        # Now for each key in total_times_for_each_key calculate min, max, and mean
+        for key, times in total_times_for_each_key.items():
+            max_time_key = max(times)
+            min_time_key = min(times)
+            mean_time_key = sum(times) / len(times)
+
+            print(f"Max time for {key}: {max_time_key:.4}")
+            print(f"Min time for {key}: {min_time_key:.4}")
+            print(f"Mean time for {key}: {mean_time_key:.4}" )
+
 
                     # if lowest_score < 0.4:
                     #     low_confidence_image_path = os.path.join(low_confidence_path, f"{lowest_score:.2f}_{file}")

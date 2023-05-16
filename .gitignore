@@ -169,3 +169,13 @@ csrc/mmdeploy/preprocess/elena/cuda_kernel/*
 
 # c#
 demo/csharp/*/Properties
+TensorRT-8.2.3.0
+onnxruntime-linux-x64-*
+download
+*.tgz
+*.tar.gz
+onnxruntime-linux-x64-gpu-*
+third_party
+ppl.cv
+output_detection.png
+spdlog/
