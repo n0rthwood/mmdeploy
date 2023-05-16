@@ -3,8 +3,8 @@
 		<MMDeployNativeDlls>$(MSBuildThisFileDirectory)..\..\runtimes</MMDeployNativeDlls>
 	</PropertyGroup>
 	<ItemGroup Condition="$(TargetFrameworkVersion.StartsWith('v4')) Or $(TargetFramework.StartsWith('net4'))">
-		<Content Include="$(MMDeployNativeDlls)\win-x64\native\mmdeploy.dll">
-			<Link>mmdeploy.dll</Link>
+		<Content Include="/opt/workspace/mmdeploy/mmdeploy-1.0.0-linux-x86_64-cuda11.3/lib/libmmdeploy.so">
+			<Link>/opt/workspace/mmdeploy/mmdeploy-1.0.0-linux-x86_64-cuda11.3/lib/libmmdeploy.so</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>

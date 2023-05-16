@@ -5,7 +5,7 @@
 #   Run this script to build MMDeploy SDK and install necessary prerequisites.
 #   This script will also setup python venv and generate prebuild binaries if requested.
 #
-
+source ./set_env.sh
 #####
 # Build vars
 BUILD_TYPE="Release"

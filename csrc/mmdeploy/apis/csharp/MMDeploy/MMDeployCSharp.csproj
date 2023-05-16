@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netcoreapp3.1;net48;</TargetFrameworks>
     <LangVersion>9.0</LangVersion>
     <Nullable>enable</Nullable>
     <AssemblyName>MMDeployCSharp</AssemblyName>
@@ -11,16 +10,17 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Platforms>AnyCPU;x64</Platforms>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
 
   <PropertyGroup>
     <MMDeployNativeDlls>$(MSBuildThisFileDirectory)\..\..\..\..\..</MMDeployNativeDlls>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="$(MMDeployNativeDlls)\build\bin\Release\mmdeploy.dll">
+    <Content Include="/opt/workspace/mmdeploy/mmdeploy-1.0.0-linux-x86_64-cuda11.3/lib/libmmdeploy.so">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Pack>true</Pack>
-      <PackagePath>runtimes\win-x64\native\mmdeploy.dll</PackagePath>
+      <PackagePath>runtimes\libmmdeploy.so</PackagePath>
     </Content>
     <Content Include="MMDeployCSharp.props">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
