@@ -1,14 +1,26 @@
 import numpy as np
 import copy
 import cv2
-def draw_rotated_bbox(img, rect, box, color,mask_index,grid_cord):
+def draw_rotated_bbox(img, rect, box, color,mask_index,grid_cord,result_obj):
     if rect is not None and box is not None:
         cv2.drawContours(img, [box], 0, color, 2)
         cv2.circle(img, box[0], 2, [0, 0, 255], 5) # Red 1
         cv2.circle(img, box[1], 2, [0, 255, 255], 5) # Yellow 2
         cv2.circle(img, box[2], 2, [255, 0, 0], 5) # Blue 3
+
+        
+        width = result_obj["width"]
+        height = result_obj["height"]
+        color = result_obj["color"]
+        winkle_score = result_obj["winkle_score"]
+
         text=f"idx:{mask_index} grid({grid_cord[0]},{grid_cord[1]})"
-        draw_text(img, text, box[0], (0, 0, 255), thickness=2);
+        text2=f"w,h:{width:.2f},{height:.2f}"
+        text3=f"color:{color:.2f},ws:{winkle_score:.2f}"
+        #print(f"box[0]:{box[0]}")
+        draw_text(img, text, box[0], (0, 255, 255), thickness=2);
+        draw_text(img, text2, (box[0][0],box[0][1]+30), (0, 255, 255), thickness=2);
+        draw_text(img, text3, (box[0][0],box[0][1]+60), (0, 255, 255), thickness=2);
     return img
 
 def draw_text(img, text, position, color, thickness=2,font=cv2.FONT_HERSHEY_SIMPLEX):

@@ -10,7 +10,10 @@ def get_grid(img, row=4, offset_x=0, offset_y=0):
     middle_row = row / 2
     middle_col = col / 2
     row_offset_factor = -5
-    col_offset_factor = -9
+    if(col==8):
+        col_offset_factor = -5
+    else:
+        col_offset_factor = -9
 
     grid = []
     for i in range(row):
@@ -67,10 +70,12 @@ def process_mask_grid(masks, grid,mask_coordinates, center_diff_thresh):
     for mask_index, mask in enumerate(masks):
         left,top = mask_coordinates[mask_index]
         rect, box = get_rotated_bbox(mask,left,top)
+        langscape_flag=True
         if rect is not None:
             mask_center = (int(rect[0][0]), int(rect[0][1]))
             width, height = rect[1]
             if width < height:
+                langscape_flag=False
                 width, height = height, width
             row, col = mask_center_in_grid(mask_center, grid)
             bbox_in_grids_arr = bbox_in_grids(box,grid)
@@ -79,7 +84,7 @@ def process_mask_grid(masks, grid,mask_coordinates, center_diff_thresh):
             mask_pixels = mask[mask == 255]
             color = np.mean(mask_pixels)
 
-            mask_data.append((mask_center, rect, box, (width, height, color), (row, col),bbox_in_grids_arr))
+            mask_data.append((mask_center, rect, box, (width, height, color), (row, col),bbox_in_grids_arr,langscape_flag))
         else:
             mask_data.append(None)
 
@@ -150,6 +155,9 @@ def check_overlap(mask_data, overlap_thresh):
                 if overlapping_info[j].get('is_overlap', False):
                     continue
                 box2 = mask_datum2[2]
+                avg_width=(mask_datum1[3][0]+mask_datum2[3][0])/2
+                if(avg_width>180):
+                    overlap_thresh=overlap_thresh*2
                 intersection, is_overlap, overlap_percentage = is_bbox_overlap(box1, box2,[i,j] ,overlap_thresh)
 
                 if is_overlap:

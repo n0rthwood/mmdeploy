@@ -1,4 +1,4 @@
-_base_ = ['./classification_dynamic.py', '../_base_/backends/tensorrt-fp16.py']
+_base_ = ['./classification_static.py', '../_base_/backends/tensorrt.py']
 
 onnx_config = dict(input_shape=[224, 224])
 backend_config = dict(
@@ -8,6 +8,6 @@ backend_config = dict(
             input_shapes=dict(
                 input=dict(
                     min_shape=[1, 3, 224, 224],
-                    opt_shape=[24, 3, 224, 224],
-                    max_shape=[32, 3, 224, 224])))
+                    opt_shape=[1, 3, 224, 224],
+                    max_shape=[1, 3, 224, 224])))
     ])
