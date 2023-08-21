@@ -3,16 +3,17 @@ echo $PATH
 date_string=$(date +"%Y%m%d")
 cvt_config="/opt/workspace/mmdeploy/configs/mmpretrain/classification_tensorrt_static-224x224-32.py"
 cvt_config="/opt/workspace/mmdeploy/configs/mmpretrain/classification_tensorrt-fp16_dynamic-224x224-224x224.py"
+cvt_config="/opt/workspace/mmdeploy/configs/mmpretrain/classification_tensorrt-fp16_dynamic-256x256-256x256.py"
 work_dir="work_dirs/mmpretrain_repvgg_cls_${date_string}"
-model_config="/opt/workspace/mmpretrain-1/work_dirs/palmdate_repvgg/20230702_144150/vis_data/config.py"
-model_file="/opt/workspace/mmpretrain-1/work_dirs/palmdate_repvgg/best_accuracy_top1_epoch_120.pth"
+model_config="/opt/workspace/mmpretrain-1/work_dirs/palmdate_repvgg/20230820_155531_5cat/vis_data/config.py"
+model_file="/opt/workspace/mmpretrain-1/work_dirs/palmdate_repvgg/epoch_400.pth"
 
 echo "$model_config"
 python tools/deploy.py \
 $cvt_config \
 $model_config \
 $model_file \
-"/opt/images/UAE/khalash/21-11-09_09-34-06/slice/746-21-11-09 11-41-37-626_21.png" \
+"/nas/win_essd/UAE_sliced_256/fardh-重量/B/slice/15348-21-11-17 11-53-05-849_0.png" \
 --work-dir ${work_dir} \
 --device cuda     \
 --dump-info
